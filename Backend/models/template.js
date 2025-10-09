@@ -48,7 +48,9 @@ const Template = sequelize.define("Template", {
     defaultValue: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  tableName: 'templates',
+  freezeTableName: true
 });
 
 module.exports = Template;

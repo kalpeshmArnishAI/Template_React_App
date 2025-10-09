@@ -32,6 +32,7 @@ const express = require("express");
 const cors = require("cors");
 const sequelize = require("./utilities/db");
 const templateRoutes = require("./routes/templateRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 const logger = require("./middleware/logger");
 
 const app = express();
@@ -55,6 +56,7 @@ app.get("/", (req, res) => {
 
 // API routes
 app.use("/api/templates", templateRoutes);
+app.use("/api/reports", reportRoutes);
 
 // DB connection
 sequelize.sync({alter: true})
