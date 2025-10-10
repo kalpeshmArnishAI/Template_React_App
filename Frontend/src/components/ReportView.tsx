@@ -1,4 +1,3 @@
-
 // import { useState, useEffect } from 'react';
 // import { motion } from 'framer-motion';
 // import { Button } from '@/components/ui/button';
@@ -158,7 +157,6 @@
 //           <h2 className="text-xl font-bold text-gray-800 mb-8 md:mb-12 text-center">Create Report</h2>
 //           <div className="w-full max-w-xl mx-auto">
 //             <div className="relative">
-//               {/* --- CHANGE IS HERE --- */}
 //               {/* Connector Line Track */}
 //               <div className="absolute left-16 right-16 top-4 h-0.5">
 //                 <div className="absolute top-0 left-0 h-full bg-gray-200 w-full"></div>
@@ -175,12 +173,12 @@
 //                     {/* Circle */}
 //                     <div
 //                       className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold transition-all duration-300
-//                         ${currentStep > step.number ? 'bg-green-500 text-white' : ''}
-//                         ${currentStep === step.number ? 'bg-blue-600 text-white ring-4 ring-blue-200' : ''}
+//                         ${(currentStep > step.number || (currentStep === steps.length && step.number === steps.length)) ? 'bg-green-500 text-white' : ''}
+//                         ${(currentStep === step.number && currentStep < steps.length) ? 'bg-blue-600 text-white ring-4 ring-blue-200' : ''}
 //                         ${currentStep < step.number ? 'bg-gray-200 text-gray-500' : ''}
 //                       `}
 //                     >
-//                       {currentStep > step.number ? <Check className="w-5 h-5" /> : step.number}
+//                       {(currentStep > step.number || (currentStep === step.number && step.number === steps.length)) ? <Check className="w-5 h-5" /> : step.number}
 //                     </div>
 //                     {/* Text */}
 //                     <div className="mt-2 w-32">
@@ -214,7 +212,6 @@
 //                     <tbody className=" divide-y divide-gray-800 bg-white">
 //                       {fields.map((f, index) => (
 //                         <tr key={f.key} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-//                           {/* --- CHANGE IS HERE --- */}
 //                           <td className="px-6 py-4 w-1/2 border-r border-gray-800">
 //                             <Label htmlFor={f.key} className="text-sm font-medium text-gray-700">
 //                               {f.label}
@@ -258,7 +255,6 @@
 
 
 
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -283,6 +279,7 @@ export default function ReportView({}: ReportViewProps) {
   type Field = { key: string; label: string };
   const [fields, setFields] = useState<Field[]>([]);
   const [templateLogoUrl, setTemplateLogoUrl] = useState<string | null>(null);
+  const [templateDescription, setTemplateDescription] = useState<string | null>(null);
 
   const formatLabel = (key: string): string => {
     const spaced = key
@@ -319,7 +316,7 @@ export default function ReportView({}: ReportViewProps) {
       const data = await res.json();
       // backend stores placeholders like "{{Name}}"; clean them to keys like "Name"
       const cleaned = (Array.isArray(data.placeholders) ? data.placeholders : [])
-        .map((ph: string) => ph.replace(/[{}]/g, '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim())
+        .map((placeholder: string) => placeholder.replace(/[{}]/g, '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim())
         .filter(Boolean);
       const dedupedKeys: string[] = [];
       const seen = new Set<string>();
@@ -329,7 +326,7 @@ export default function ReportView({}: ReportViewProps) {
         seen.add(key);
         dedupedKeys.push(keyRaw);
       }
-      const mapped: Field[] = dedupedKeys.map(k => ({ key: k, label: formatLabel(k) }));
+      const mapped: Field[] = dedupedKeys.map(duplicateKey => ({ key: duplicateKey, label: formatLabel(duplicateKey) }));
       setFields(mapped);
 
       // compute logo url from backend response
@@ -344,6 +341,12 @@ export default function ReportView({}: ReportViewProps) {
         }
       }
       setTemplateLogoUrl(computedLogo);
+      // set template description if available
+      if (data && typeof data.description === 'string' && data.description.trim().length > 0) {
+        setTemplateDescription(data.description.trim());
+      } else {
+        setTemplateDescription(null);
+      }
     } catch (e) {
       console.error(e);
       setFields([]);
@@ -402,6 +405,7 @@ export default function ReportView({}: ReportViewProps) {
     setFormData({}); // Clear form data
     setFields([]);
     setTemplateLogoUrl(null);
+    setTemplateDescription(null);
     setCurrentStep(1);
   };
 
@@ -465,7 +469,11 @@ export default function ReportView({}: ReportViewProps) {
                   <FileText className="w-12 h-12 text-blue-600 mb-3" />
                 )}
                 <h2 className="text-xl font-bold text-gray-800">{selectedTemplateName}</h2>
-                <p className="text-sm text-gray-500 mt-1">Please fill in the required details for this template.</p>
+                {templateDescription ? (
+                  <p className="text-sm text-gray-600 mt-1 max-w-3xl">{templateDescription}</p>
+                ) : (
+                  <p className="text-sm text-gray-500 mt-1">Please fill in the required details for this template.</p>
+                )}
               </div>
               <form className="w-full max-w-8xl mx-auto" onSubmit={(e) => e.preventDefault()}>
                 <div className="border border-gray-800  overflow-hidden">
@@ -473,7 +481,10 @@ export default function ReportView({}: ReportViewProps) {
                     <tbody className=" divide-y divide-gray-800 bg-white">
                       {fields.map((f, index) => (
                         <tr key={f.key} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                          <td className="px-6 py-4 w-1/2 border-r border-gray-800">
+                          <td className="px-4 py-4 w-12 text-center border-r border-gray-800">
+                            {index + 1}
+                          </td>
+                          <td className="px-6 py-4 w-1/4 border-r border-gray-800">
                             <Label htmlFor={f.key} className="text-sm font-medium text-gray-700">
                               {f.label}
                             </Label>
@@ -481,8 +492,8 @@ export default function ReportView({}: ReportViewProps) {
                           <td className="px-6 py-4">
                             <Textarea
                               id={f.key}
-                              placeholder={`Enter ${f.label}...`}
-                              className="bg-white border-gray-300 w-full"
+                              // placeholder={`Enter ${f.label}...`}
+                              className="bg-white border-gray-100 w-full "
                               value={formData[f.key] || ''}
                               onChange={(e) => handleInputChange(f.key, e.target.value)}
                             />
@@ -513,3 +524,4 @@ export default function ReportView({}: ReportViewProps) {
 function StepContent({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (<motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>{title && (<div className="mb-6"><h2 className="text-2xl font-bold text-gray-800">{title}</h2><p className="text-gray-500 mt-1">{description}</p></div>)}<div>{children}</div></motion.div>);
 }
+
