@@ -167,6 +167,7 @@ exports.fillTemplate = async (req, res) => {
   try {
     const templateId = req.params.id;
     const data = req.body.data;
+    const requestedFormat = (req.body.format || 'docx').toLowerCase();
 
     if (!data || typeof data !== "object" || Object.keys(data).length === 0) {
       return res.status(400).json({ error: "Data for placeholders required and must be an object" });
@@ -193,6 +194,74 @@ exports.fillTemplate = async (req, res) => {
       type: "nodebuffer",
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
+
+    if (requestedFormat === 'pdf') {
+      const os = require('os');
+      const pathFs = require('path');
+      const { execFile } = require('child_process');
+      const execFileAsync = (file, args) => new Promise((resolve, reject) => {
+        execFile(file, args, { windowsHide: true }, (error, stdout, stderr) => {
+          if (error) return reject(Object.assign(error, { stdout, stderr }));
+          resolve({ stdout, stderr });
+        });
+      });
+
+      // Prefer Microsoft Word on Windows (if installed)
+      if (process.platform === 'win32') {
+        const tmpDir = pathFs.join(os.tmpdir(), 'report_convert');
+        await fs.mkdir(tmpDir, { recursive: true });
+        const base = `${template.name}_filled_${Date.now()}`.replace(/\s/g, '_');
+        const docxPath = pathFs.join(tmpDir, `${base}.docx`);
+        const pdfPath = pathFs.join(tmpDir, `${base}.pdf`);
+        await fs.writeFile(docxPath, buf);
+
+        const psScript = `
+          $ErrorActionPreference = 'Stop'
+          $docx = '${docxPath.replace(/\\/g, '/')}'
+          $pdf  = '${pdfPath.replace(/\\/g, '/')}'
+          $word = New-Object -ComObject Word.Application
+          try {
+            $word.Visible = $false
+            $document = $word.Documents.Open($docx)
+            $wdExportFormatPDF = 17
+            $document.ExportAsFixedFormat($pdf, $wdExportFormatPDF)
+            $document.Close([ref]$false)
+          } finally {
+            $word.Quit()
+          }
+        `;
+
+        try {
+          await execFileAsync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', psScript]);
+          const pdfBuf = await fs.readFile(pdfPath);
+          const filename = `${base}.pdf`;
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.setHeader('Content-Type', 'application/pdf');
+          await fs.rm(docxPath, { force: true });
+          await fs.rm(pdfPath, { force: true });
+          return res.send(pdfBuf);
+        } catch (wordErr) {
+          console.error('Microsoft Word PDF conversion failed:', wordErr);
+          // fall through to try LibreOffice next
+          try { await fs.rm(docxPath, { force: true }); await fs.rm(pdfPath, { force: true }); } catch {}
+        }
+      }
+
+      // Fallback: LibreOffice conversion (cross-platform)
+      try {
+        const libre = require('libreoffice-convert');
+        const util = require('util');
+        const convertAsync = util.promisify(libre.convert);
+        const pdfBuf = await convertAsync(buf, '.pdf', undefined);
+        const filename = `${template.name}_filled_${Date.now()}.pdf`.replace(/\s/g, "_");
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', 'application/pdf');
+        return res.send(pdfBuf);
+      } catch (convErr) {
+        console.error('PDF conversion failed (LibreOffice):', convErr);
+        return res.status(500).json({ error: 'PDF conversion failed. Install Microsoft Word (Windows) or LibreOffice and ensure it is on PATH.' });
+      }
+    }
 
     const filename = `${template.name}_filled_${Date.now()}.docx`.replace(/\s/g, "_");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
