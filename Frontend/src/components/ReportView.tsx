@@ -415,7 +415,7 @@ export default function ReportView({}: ReportViewProps) {
 
   // --- JSX REMAINS UNCHANGED, ONLY LOGIC IS UPDATED ---
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="container mx-auto px-6 py-12">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="container mx-auto p-20">
       <div className="bg-white rounded-lg shadow-xl border border-gray-200">
         {/* Stepper UI at the top */}
         <div className="p-6 md:p-8 border-b border-gray-200">

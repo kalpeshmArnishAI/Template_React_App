@@ -207,6 +207,7 @@ exports.fillTemplate = async (req, res) => {
       });
 
       // Prefer Microsoft Word on Windows (if installed)
+      // Note: Node reports 'win32' on all Windows variants, including 64-bit
       if (process.platform === 'win32') {
         const tmpDir = pathFs.join(os.tmpdir(), 'report_convert');
         await fs.mkdir(tmpDir, { recursive: true });
